@@ -139,17 +139,7 @@
             <button id="addNow" class="btn">Jetzt</button>
           </div>
 
-          <details class="settings" style="margin-top:14px;">
-            <summary>⚙️ Erweiterte Einstellungen (Modelle & Parameter)</summary>
-            <div class="content" style="padding:10px 0 0 0;">
-              <p class="muted" style="margin-top:0;">Standard‑Modelle sind konservative Näherungen. Du kannst Halbwertszeit (Elimination <code>ke</code>), Absorption <code>ka</code> und Freisetzungs‑Fenster anpassen, falls sich deine reale Wirkung spürbar anders verhält.</p>
-              <div id="settingsFields" class="two-col"></div>
-              <div class="row" style="margin-top:8px;">
-                <button id="saveSettings" class="btn">Einstellungen speichern</button>
-                <button id="resetSettings" class="btn btn-ghost">Zurücksetzen</button>
-              </div>
-            </div>
-          </details>
+          
         </div>
       </section>
 
@@ -188,19 +178,17 @@
   // ————————————————
   // Daten & Modelle
   // ————————————————
-  const DEFAULT_MODELS = {
-    // Alle ka/ke sind pro Stunde. ke ~ ln(2)/Halbwertszeit.
-    // Du kannst das im UI anpassen.
+  const MODELS = {
     ritalin_ir_5: {
-      label: "Ritalin (IR) 5 mg",
+      label: "Ritalin 5mg",
       mg: 5,
       kind: "IR",
-      ka: 1.5,           // schnelle Aufnahme
-      ke: 0.231,         // ~ 3h Halbwertszeit
+      ka: 1.5,
+      ke: 0.231,
       color: "#7fb3ff"
     },
     ritalin_ir_10: {
-      label: "Ritalin (IR) 10 mg",
+      label: "Ritalin 10mg",
       mg: 10,
       kind: "IR",
       ka: 1.5,
@@ -208,28 +196,17 @@
       color: "#7fb3ff"
     },
     sandoz_retard_18: {
-      label: "Methylphenidat Sandoz retard 18 mg",
+      label: "Methylphenidat Sandoz retard 18mg",
       mg: 18,
-      kind: "BIPHASIC",  // einfache Annahme: 50% sofort, 50% nach ~4h
+      kind: "BIPHASIC",
       ka: 1.3,
       ke: 0.231,
-      lag2: 4.0,         // zweite Freisetzung (h)
+      lag2: 4.0,
       color: "#85e0a3"
     },
     concerta_27: {
-      label: "Concerta 27 mg",
+      label: "Concerta 27mg",
       mg: 27,
-      kind: "CONCERTA",  // 22% IR + 78% quasi gleichmäßig 10h
-      ka: 1.2,
-      ke: 0.231,
-      infusionStart: 1.0, // h
-      infusionEnd: 11.0,  // h (≈10h Fenster)
-      irFraction: 0.22,
-      color: "#f5c36a"
-    },
-    concerta_36: {
-      label: "Concerta 36 mg",
-      mg: 36,
       kind: "CONCERTA",
       ka: 1.2,
       ke: 0.231,
@@ -238,13 +215,23 @@
       irFraction: 0.22,
       color: "#f5c36a"
     },
+    concerta_36: {
+      label: "Concerta 36mg",
+      mg: 36,
+      kind: "CONCERTA",
+      ka: 1.2,
+      ke: 0.231,
+      infusionStart: 1.0,
+      infusionEnd: 11.0,
+      irFraction: 0.22,
+      color: "#f5c36a"
+    }
   };
 
   const STATE = {
     doses: load("doses", []),      // [{id, key, mg, t (ms)}]
     notes: load("notes", []),      // [{id, t, text}]
-    models: load("models", DEFAULT_MODELS),
-    hoursWindow: 24,
+    hoursWindow: 24
   };
 
   function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
@@ -263,7 +250,7 @@
 
   // Beitrag eines Events (Dosis) zum Zeitpunkt tNow (ms)
   function effectOfDoseAt(dose, tNow){
-    const model = STATE.models[dose.key];
+    const model = MODELS[dose.key];
     const dtH = (tNow - dose.t) / 3600000; // Stunden seit Einnahme
     if(model.kind === "IR"){
       return bateman(dtH, dose.mg, model.ka, model.ke);
@@ -313,10 +300,7 @@
   const exportBtn = document.getElementById('exportCsv');
   const clearBtn = document.getElementById('clearAll');
 
-  const settingsFields = document.getElementById('settingsFields');
-  const saveSettingsBtn = document.getElementById('saveSettings');
-  const resetSettingsBtn = document.getElementById('resetSettings');
-
+      
   function pad(n){ return String(n).padStart(2,'0'); }
   function toLocalDatetimeValue(ms){
     const d = new Date(ms);
@@ -327,10 +311,11 @@
 
   function initMeds(){
     medSel.innerHTML = '';
-    Object.entries(STATE.models).forEach(([key, m])=>{
+    Object.entries(MODELS).forEach(([key, m])=>{
       const opt = document.createElement('option');
       opt.value = key; opt.textContent = m.label; medSel.appendChild(opt);
     });
+  });
   }
 
   function initTimeDefault(){ timeSel.value = toLocalDatetimeValue(Date.now()); }
@@ -341,7 +326,7 @@
     if(sorted.length===0){ doseList.innerHTML = '<div class="muted">Noch keine Einträge.</div>'; return; }
     for(const d of sorted){
       const div = document.createElement('div'); div.className='dose-item';
-      const m = STATE.models[d.key];
+      const m = MODELS[d.key];
       const dt = new Date(d.t);
       const strong = document.createElement('div');
       strong.innerHTML = `<strong>${m.label}</strong><br><small>${dt.toLocaleString()}</small>`;
@@ -440,10 +425,10 @@
       const py = (H-P) - (H-2*P) * (totalEffectAt(dse.t)/maxY);
       const circ = document.createElementNS('http://www.w3.org/2000/svg','circle');
       circ.setAttribute('cx', px); circ.setAttribute('cy', py); circ.setAttribute('r','7');
-      circ.setAttribute('fill', STATE.models[dse.key].color);
+      circ.setAttribute('fill', MODELS[dse.key].color);
       circ.style.cursor='pointer';
       circ.addEventListener('click', ()=>{
-        const m = STATE.models[dse.key];
+        const m = MODELS[dse.key];
         alert(`${m.label}\n${new Date(dse.t).toLocaleString()}`);
       });
       chart.appendChild(circ);
@@ -455,59 +440,11 @@
   function redraw(){ renderDoseList(); renderNotes(); drawChart(); }
 
   // ————————————————
-  // Einstellungen (Modelle)
-  // ————————————————
-  function renderSettings(){
-    settingsFields.innerHTML='';
-    Object.entries(STATE.models).forEach(([key,m])=>{
-      const box = document.createElement('div');
-      box.className='card';
-      box.style.padding='8px';
-      box.innerHTML = `<div style="font-weight:700; color:#d8e4ff; margin:6px 6px 8px;">${m.label}</div>`;
-      const wrap = document.createElement('div'); wrap.style.padding='0 8px 8px';
-
-      wrap.appendChild(inputRow('Elimination ke (1/h)', `ke_${key}`, m.ke));
-      wrap.appendChild(inputRow('Absorption ka (1/h)', `ka_${key}`, m.ka));
-      if(m.kind==='BIPHASIC') wrap.appendChild(inputRow('2. Freisetzung (h)', `lag2_${key}`, m.lag2));
-      if(m.kind==='CONCERTA'){
-        wrap.appendChild(inputRow('IR‑Anteil (0…1)', `irFraction_${key}`, m.irFraction));
-        wrap.appendChild(inputRow('Infusion Start (h)', `infusionStart_${key}`, m.infusionStart));
-        wrap.appendChild(inputRow('Infusion Ende (h)', `infusionEnd_${key}`, m.infusionEnd));
-      }
-      box.appendChild(wrap); settingsFields.appendChild(box);
-    });
-  }
-
-  function inputRow(lbl, id, val){
-    const div = document.createElement('div'); div.style.margin='6px 0';
-    const lab = document.createElement('label'); lab.textContent = lbl; lab.setAttribute('for', id);
-    const inp = document.createElement('input'); inp.id=id; inp.type='number'; inp.step='0.001'; inp.value=val; inp.style.width='100%';
-    div.appendChild(lab); div.appendChild(inp); return div;
-  }
-
-  function applySettingsFromUi(){
-    const next = JSON.parse(JSON.stringify(STATE.models));
-    for(const [key,m] of Object.entries(next)){
-      const g = (id)=> parseFloat(document.getElementById(id+"_"+key)?.value);
-      m.ke = parseFloat(document.getElementById(`ke_${key}`).value);
-      m.ka = parseFloat(document.getElementById(`ka_${key}`).value);
-      if(m.kind==='BIPHASIC') m.lag2 = parseFloat(document.getElementById(`lag2_${key}`).value);
-      if(m.kind==='CONCERTA'){
-        m.irFraction = parseFloat(document.getElementById(`irFraction_${key}`).value);
-        m.infusionStart = parseFloat(document.getElementById(`infusionStart_${key}`).value);
-        m.infusionEnd = parseFloat(document.getElementById(`infusionEnd_${key}`).value);
-      }
-    }
-    STATE.models = next; save('models', STATE.models); redraw();
-  }
-
-  function resetSettings(){ STATE.models = JSON.parse(JSON.stringify(DEFAULT_MODELS)); save('models', STATE.models); renderSettings(); redraw(); }
-
-  // ————————————————
   // Events
   // ————————————————
+  // ————————————————
   addDoseBtn.onclick = ()=>{
-    const key = medSel.value; const model = STATE.models[key]; if(!model) return;
+    const key = medSel.value; const model = MODELS[key]; if(!model) return;
     const t = new Date(timeSel.value).getTime(); if(!Number.isFinite(t)) return alert('Bitte gültige Zeit wählen.');
     STATE.doses.push({ id: uid(), key, mg: model.mg, t });
     save('doses', STATE.doses); redraw();
@@ -525,7 +462,7 @@
   exportBtn.onclick = ()=>{
     const rows = [
       ['type','datetime','med_key','label','mg','note','effect_at_time'],
-      ...STATE.doses.map(d=>['dose', new Date(d.t).toISOString(), d.key, STATE.models[d.key].label, d.mg, '', totalEffectAt(d.t).toFixed(4)]),
+      ...STATE.doses.map(d=>['dose', new Date(d.t).toISOString(), d.key, MODELS[d.key].label, d.mg, '', totalEffectAt(d.t).toFixed(4)]),
       ...STATE.notes.map(n=>['note', new Date(n.t).toISOString(), '', '', '', n.text.replace(/\n/g,' '), totalEffectAt(n.t).toFixed(4)])
     ];
     const csv = rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\n');
@@ -544,14 +481,14 @@
   // Boot
   // ————————————————
   function boot(){
-    initMeds(); initTimeDefault(); renderDoseList(); renderNotes(); renderSettings(); drawChart();
+    initMeds(); initTimeDefault(); renderDoseList(); renderNotes();  drawChart();
     // Service Worker registrieren (PWA offline)
     if('serviceWorker' in navigator){
       navigator.serviceWorker.register('./service-worker.js').catch(console.warn);
     }
     // Boot
   function boot(){
-    initMeds(); initTimeDefault(); renderDoseList(); renderNotes(); renderSettings(); drawChart();
+    initMeds(); initTimeDefault(); renderDoseList(); renderNotes();  drawChart();
     // Service Worker registrieren (PWA offline)
     if('serviceWorker' in navigator){
       navigator.serviceWorker.register('./service-worker.js').catch(console.warn);
