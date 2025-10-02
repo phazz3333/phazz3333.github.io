@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ADHS Kurven" />
+
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <title>ADHS Med Kurven (lokal)</title>
+  <style>
+    :root{
+      --bg: #0f1220;        /* dunkles, augenfreundliches UI */
+      --panel: #151832;
+      --panel-2: #1a1f3f;
+      --text: #f4f6ff;
+      --muted: #aab3d0;
+      --accent: #6aa0ff;
+      --good: #58d68d;
+      --warn: #f5b041;
+      --danger:#ff6b6b;
+      --shadow: 0 10px 25px rgba(0,0,0,.35);
+      --radius: 18px;
+      --gap: 14px;
+      --card-pad: 16px;
+      --font-scale: clamp(16px, 1.6vw + 12px, 19px); /* iPhone freundlich */
+    }
+    html,body{height:100%;}
+    html{ font-size: var(--font-scale); }
+    body{
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color:var(--text); background: radial-gradient(1200px 500px at 50% -50%, #192047 0%, #0f1220 60%);
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+      min-height: 100vh; /* Fallback */
+      min-height: 100dvh; /* Mobile: dynamische Toolbar-Höhe berücksichtigen */
+      padding-bottom: env(safe-area-inset-bottom);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .app{max-width:900px; margin:0 auto; padding:20px 16px calc(40px + env(safe-area-inset-bottom));}
+
+    header{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px;}
+    .title{ font-weight:800; letter-spacing:.4px; font-size:1.5rem; /* ~24px auf iPhone */ }
+    .tag{ background:linear-gradient(135deg,#2a2f63,#1b2047); border:1px solid #2a3066; color:#c9d3ff; padding:8px 12px; border-radius:999px; font-size:.8rem; }
+
+    .grid{ display:grid; grid-template-columns: 1fr; gap:var(--gap);}    
+    @media (min-width:800px){ .grid{ grid-template-columns: 1fr 360px; } }
+
+    .card{ background:linear-gradient(180deg, var(--panel), var(--panel-2)); border:1px solid #2a3066; border-radius:var(--radius); box-shadow:var(--shadow); }
+    .card h2{ font-size:1rem; letter-spacing:.3px; font-weight:700; margin:0; padding:14px var(--card-pad); border-bottom:1px solid #2a3066; color:#cfe0ff; }
+    .card .content{ padding:var(--card-pad); }
+
+    .row{ display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+    label{ font-size:.9rem; color:var(--muted); display:block; margin-bottom:6px; }
+
+    /* Form Controls – 16px+ vermeidet iOS Auto‑Zoom */
+    select,input,textarea,button{ border-radius:14px; border:1px solid #31396f; background:#121632; color:var(--text); padding:12px 14px; outline:none; font-size:16px; }
+    select,input{ height:48px; }
+    textarea{ width:100%; min-height:100px; resize:vertical; }
+
+    button{ cursor:pointer; font-weight:700; letter-spacing:.3px; min-height:48px; min-width:44px; }
+    .btn{ background:linear-gradient(180deg,#25306b,#1a1f46); }
+    .btn:hover{ filter:brightness(1.07); }
+    .btn-accent{ background:linear-gradient(180deg,#4f7ff8,#3063ee); border-color:#3b63ff; }
+    .btn-danger{ background:linear-gradient(180deg,#c24747,#a73c3c); border-color:#d85858; }
+    .btn-ghost{ background:transparent; border-color:#3a4077; }
+
+    .pill{ padding:8px 12px; border-radius:12px; border:1px solid #33407a; font-size:.9rem; color:#cbd6ff; }
+    .list{ display:flex; flex-direction:column; gap:12px; }
+    .dose-item{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px; border:1px dashed #38407a; border-radius:14px; background: #121633; }
+    .dose-item small{ color:#9fb0ee; }
+
+    .chart-wrap{ position:relative; height: clamp(280px, 45dvh, 560px); }
+    svg{ width:100%; height:100%; display:block; }
+    .legend{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:.9rem; color:#c6d1ff; }
+
+    .muted{ color:var(--muted); }
+    .now-value{ font-weight:800; font-size:1.75rem; letter-spacing:.4px; }
+
+    details.settings{ border:1px dashed #34407a; border-radius:14px; padding:10px 12px; background:#0e1331; }
+    details.settings summary{ cursor:pointer; font-weight:700; color:#cfe0ff; font-size:1rem; }
+    .two-col{ display:grid; grid-template-columns:1fr; gap:10px; }
+    @media (min-width:800px){ .two-col{ grid-template-columns:1fr 1fr; } }
+
+    footer{ margin-top:16px; color:#98a4d2; font-size:.85rem; }
+    .disclaimer{ color:#9fb0ee; font-size:.85rem; line-height:1.6; }
+
+    /* Bessere Focus-Sichtbarkeit für Tasten & Inputs */
+    :focus-visible{ outline:2px solid #7aa2ff; outline-offset:2px; border-color:#7aa2ff; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="title">ADHS Med Kurven</div>
+      <div class="tag">Offline • lokal auf diesem iPhone</div>
+    </header>
+
+    <div class="grid">
+      <!-- LEFT: Chart & Notes -->
+      <section class="card">
+        <h2>Wirkung – letzte 24 Stunden</h2>
+        <div class="content">
+          <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+            <div class="legend">
+              <span class="pill">Gesamt (relative Einheiten)</span>
+              <span class="pill">Jetzt: <span id="nowValue" class="now-value">0.0</span></span>
+            </div>
+            <div class="row">
+              <button id="btn24" class="btn pill">24h</button>
+              <button id="btn48" class="btn pill">48h</button>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <svg id="chart" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-label="Wirkungsverlauf"></svg>
+          </div>
+          <div class="muted" style="margin-top:8px;">Tippe auf Dosen-Marker im Diagramm für Details.</div>
+        </div>
+      </section>
+
+      <!-- RIGHT: Input / List / Export -->
+      <section class="card">
+        <h2>Eintragen</h2>
+        <div class="content">
+          <div class="row">
+            <div style="flex:1; min-width:200px;">
+              <label for="medSel">Präparat & Dosis</label>
+              <select id="medSel"></select>
+            </div>
+            <div>
+              <label for="timeSel">Einnahmezeit</label>
+              <input id="timeSel" type="datetime-local" />
+            </div>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <button id="addDose" class="btn btn-accent">Dosis hinzufügen</button>
+            <button id="addNow" class="btn">Jetzt</button>
+          </div>
+
+          <details class="settings" style="margin-top:14px;">
+            <summary>⚙️ Erweiterte Einstellungen (Modelle & Parameter)</summary>
+            <div class="content" style="padding:10px 0 0 0;">
+              <p class="muted" style="margin-top:0;">Standard‑Modelle sind konservative Näherungen. Du kannst Halbwertszeit (Elimination <code>ke</code>), Absorption <code>ka</code> und Freisetzungs‑Fenster anpassen, falls sich deine reale Wirkung spürbar anders verhält.</p>
+              <div id="settingsFields" class="two-col"></div>
+              <div class="row" style="margin-top:8px;">
+                <button id="saveSettings" class="btn">Einstellungen speichern</button>
+                <button id="resetSettings" class="btn btn-ghost">Zurücksetzen</button>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Notiz</h2>
+        <div class="content">
+          <label for="noteTxt">Wie fühlst du dich (Fokus, Stimmung, Nebenwirkungen …)?</label>
+          <textarea id="noteTxt" placeholder="Kurz notieren…"></textarea>
+          <div class="row" style="margin-top:8px;">
+            <button id="saveNote" class="btn">Notiz mit aktuellem Zeitpunkt speichern</button>
+          </div>
+          <div id="notesList" class="list" style="margin-top:10px;"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Dosenverlauf</h2>
+        <div class="content">
+          <div id="doseList" class="list"></div>
+          <div class="row" style="margin-top:12px; justify-content:space-between;">
+            <button id="exportCsv" class="btn">CSV exportieren</button>
+            <button id="clearAll" class="btn btn-danger">Alles löschen</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer>
+      <p class="disclaimer">
+        ⚠️ Diese App ersetzt <strong>keine</strong> medizinische Beratung. Die Kurven sind <em>modellierte</em> relative Wirkstärken (keine medizinischen Werte). Sprich Änderungen immer mit deiner Ärztin/deinem Arzt ab.
+      </p>
+    </footer>
+  </div>
+
+  <script>
+  // ————————————————
+  // Daten & Modelle
+  // ————————————————
+  const DEFAULT_MODELS = {
+    // Alle ka/ke sind pro Stunde. ke ~ ln(2)/Halbwertszeit.
+    // Du kannst das im UI anpassen.
+    ritalin_ir_5: {
+      label: "Ritalin (IR) 5 mg",
+      mg: 5,
+      kind: "IR",
+      ka: 1.5,           // schnelle Aufnahme
+      ke: 0.231,         // ~ 3h Halbwertszeit
+      color: "#7fb3ff"
+    },
+    ritalin_ir_10: {
+      label: "Ritalin (IR) 10 mg",
+      mg: 10,
+      kind: "IR",
+      ka: 1.5,
+      ke: 0.231,
+      color: "#7fb3ff"
+    },
+    sandoz_retard_18: {
+      label: "Methylphenidat Sandoz retard 18 mg",
+      mg: 18,
+      kind: "BIPHASIC",  // einfache Annahme: 50% sofort, 50% nach ~4h
+      ka: 1.3,
+      ke: 0.231,
+      lag2: 4.0,         // zweite Freisetzung (h)
+      color: "#85e0a3"
+    },
+    concerta_27: {
+      label: "Concerta 27 mg",
+      mg: 27,
+      kind: "CONCERTA",  // 22% IR + 78% quasi gleichmäßig 10h
+      ka: 1.2,
+      ke: 0.231,
+      infusionStart: 1.0, // h
+      infusionEnd: 11.0,  // h (≈10h Fenster)
+      irFraction: 0.22,
+      color: "#f5c36a"
+    },
+    concerta_36: {
+      label: "Concerta 36 mg",
+      mg: 36,
+      kind: "CONCERTA",
+      ka: 1.2,
+      ke: 0.231,
+      infusionStart: 1.0,
+      infusionEnd: 11.0,
+      irFraction: 0.22,
+      color: "#f5c36a"
+    },
+  };
+
+  const STATE = {
+    doses: load("doses", []),      // [{id, key, mg, t (ms)}]
+    notes: load("notes", []),      // [{id, t, text}]
+    models: load("models", DEFAULT_MODELS),
+    hoursWindow: 24,
+  };
+
+  function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+  function load(k, fallback){ try{ return JSON.parse(localStorage.getItem(k)) ?? fallback } catch(e){ return fallback } }
+  function uid(){ return Math.random().toString(36).slice(2,9); }
+
+  // ————————————————
+  // Mathe/Pharmakokinetik (vereinfachte Modelle!)
+  // ————————————————
+  // Bateman-Funktion (1. Ordnung Absorption + Elimination) — relative Einheiten
+  function bateman(tHours, doseMg, ka, ke){
+    if(tHours <= 0) return 0;
+    const A = doseMg * (ka/(ka - ke));
+    return A * (Math.exp(-ke * tHours) - Math.exp(-ka * tHours));
+  }
+
+  // Beitrag eines Events (Dosis) zum Zeitpunkt tNow (ms)
+  function effectOfDoseAt(dose, tNow){
+    const model = STATE.models[dose.key];
+    const dtH = (tNow - dose.t) / 3600000; // Stunden seit Einnahme
+    if(model.kind === "IR"){
+      return bateman(dtH, dose.mg, model.ka, model.ke);
+    }
+    if(model.kind === "BIPHASIC"){
+      // 50% sofort, 50% nach lag2
+      const part = 0.5 * dose.mg;
+      return bateman(dtH, part, model.ka, model.ke)
+           + bateman(dtH - model.lag2, part, model.ka, model.ke);
+    }
+    if(model.kind === "CONCERTA"){
+      // 22% IR + 78% als viele kleine Mikro-Dosen über ein Fenster (Infusion)
+      const ir = dose.mg * model.irFraction;
+      const ext = dose.mg - ir;
+      let sum = bateman(dtH, ir, model.ka, model.ke);
+      const start = model.infusionStart; const end = model.infusionEnd;
+      const N = 80; // Mikro-Dosen für glatte Kurve
+      for(let i=0;i<N;i++){
+        const frac = (i+0.5)/N;
+        const relH = start + frac*(end-start); // Stunde relativ nach Einnahme
+        sum += bateman(dtH - relH, ext/N, model.ka, model.ke);
+      }
+      return sum;
+    }
+    return 0;
+  }
+
+  function totalEffectAt(tNow){
+    return STATE.doses.reduce((acc,d)=> acc + effectOfDoseAt(d, tNow), 0);
+  }
+
+  // ————————————————
+  // UI Init
+  // ————————————————
+  const medSel = document.getElementById('medSel');
+  const timeSel = document.getElementById('timeSel');
+  const addDoseBtn = document.getElementById('addDose');
+  const addNowBtn = document.getElementById('addNow');
+  const doseList = document.getElementById('doseList');
+  const chart = document.getElementById('chart');
+  const nowValue = document.getElementById('nowValue');
+  const btn24 = document.getElementById('btn24');
+  const btn48 = document.getElementById('btn48');
+  const notesList = document.getElementById('notesList');
+  const noteTxt = document.getElementById('noteTxt');
+  const saveNoteBtn = document.getElementById('saveNote');
+  const exportBtn = document.getElementById('exportCsv');
+  const clearBtn = document.getElementById('clearAll');
+
+  const settingsFields = document.getElementById('settingsFields');
+  const saveSettingsBtn = document.getElementById('saveSettings');
+  const resetSettingsBtn = document.getElementById('resetSettings');
+
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function toLocalDatetimeValue(ms){
+    const d = new Date(ms);
+    const y=d.getFullYear(); const m=pad(d.getMonth()+1); const da=pad(d.getDate());
+    const h=pad(d.getHours()); const mi=pad(d.getMinutes());
+    return `${y}-${m}-${da}T${h}:${mi}`;
+  }
+
+  function initMeds(){
+    medSel.innerHTML = '';
+    Object.entries(STATE.models).forEach(([key, m])=>{
+      const opt = document.createElement('option');
+      opt.value = key; opt.textContent = m.label; medSel.appendChild(opt);
+    });
+  }
+
+  function initTimeDefault(){ timeSel.value = toLocalDatetimeValue(Date.now()); }
+
+  function renderDoseList(){
+    doseList.innerHTML = '';
+    const sorted = [...STATE.doses].sort((a,b)=>b.t - a.t);
+    if(sorted.length===0){ doseList.innerHTML = '<div class="muted">Noch keine Einträge.</div>'; return; }
+    for(const d of sorted){
+      const div = document.createElement('div'); div.className='dose-item';
+      const m = STATE.models[d.key];
+      const dt = new Date(d.t);
+      const strong = document.createElement('div');
+      strong.innerHTML = `<strong>${m.label}</strong><br><small>${dt.toLocaleString()}</small>`;
+      const del = document.createElement('button');
+      del.className='btn btn-ghost'; del.textContent='Entfernen';
+      del.onclick = ()=>{ STATE.doses = STATE.doses.filter(x=>x.id!==d.id); save('doses', STATE.doses); redraw(); };
+      div.appendChild(strong); div.appendChild(del);
+      doseList.appendChild(div);
+    }
+  }
+
+  function renderNotes(){
+    notesList.innerHTML='';
+    const sorted = [...STATE.notes].sort((a,b)=>b.t - a.t);
+    if(sorted.length===0){ notesList.innerHTML = '<div class="muted">Noch keine Notizen.</div>'; return; }
+    for(const n of sorted){
+      const wrap = document.createElement('div'); wrap.className='dose-item';
+      const dt = new Date(n.t).toLocaleString();
+      const val = totalEffectAt(n.t).toFixed(2);
+      const left = document.createElement('div');
+      left.innerHTML = `<strong>${dt}</strong><br><small>Wirkung zu diesem Zeitpunkt: ${val}</small><p style="margin:6px 0 0 0;">${escapeHtml(n.text)}</p>`;
+      const del = document.createElement('button'); del.className='btn btn-ghost'; del.textContent='Entfernen';
+      del.onclick = ()=>{ STATE.notes = STATE.notes.filter(x=>x.id!==n.id); save('notes', STATE.notes); renderNotes(); };
+      wrap.appendChild(left); wrap.appendChild(del); notesList.appendChild(wrap);
+    }
+  }
+
+  function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c])); }
+
+  function setWindow(h){ STATE.hoursWindow=h; redraw(); }
+
+  // ————————————————
+  // Diagramm (SVG)
+  // ————————————————
+  function drawChart(){
+    const now = Date.now();
+    const hours = STATE.hoursWindow;
+    const steps = hours*12; // 5‑Minuten Schritte
+    const xs = []; const ys = [];
+    let maxY = 0;
+    for(let i=0;i<=steps;i++){
+      const t = now - (hours*3600000) + i*(hours*3600000/steps);
+      const y = totalEffectAt(t);
+      xs.push(t); ys.push(y); if(y>maxY) maxY=y;
+    }
+    // kleine Sicherheitsmarge
+    maxY = Math.max(maxY, 1);
+
+    // SVG vorbereiten
+    const W=1000, H=300, P=36; // P=Padding
+    chart.innerHTML = '';
+
+    // Hintergrund-Gitter
+    const grid = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    for(let i=0;i<=hours;i+= (hours>24?4:2)){
+      const x = P + (W-2*P) * (i/hours);
+      const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1', x); line.setAttribute('x2', x); line.setAttribute('y1', P/2); line.setAttribute('y2', H-P/2);
+      line.setAttribute('stroke', '#2a3066'); line.setAttribute('stroke-width','1'); line.setAttribute('opacity','0.6');
+      grid.appendChild(line);
+      const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('x', x+2); txt.setAttribute('y', H-8); txt.setAttribute('fill', '#9fb0ee'); txt.setAttribute('font-size','12');
+      txt.textContent = `-${hours-i}h`;
+      grid.appendChild(txt);
+    }
+    chart.appendChild(grid);
+
+    // Pfad
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    let d = '';
+    for(let i=0;i<xs.length;i++){
+      const px = P + (W-2*P) * (i/(xs.length-1));
+      const py = (H-P) - (H-2*P) * (ys[i]/maxY);
+      d += (i===0?`M ${px} ${py}`:` L ${px} ${py}`);
+    }
+    path.setAttribute('d', d);
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke','#8fb7ff');
+    path.setAttribute('stroke-width','4.5');
+    path.setAttribute('stroke-linejoin','round');
+    chart.appendChild(path);
+
+    // "Jetzt" Linie
+    const xNow = P + (W-2*P) * (1);
+    const vline = document.createElementNS('http://www.w3.org/2000/svg','line');
+    vline.setAttribute('x1', xNow); vline.setAttribute('x2', xNow);
+    vline.setAttribute('y1', P/2); vline.setAttribute('y2', H-P/2);
+    vline.setAttribute('stroke', '#f0f3ff'); vline.setAttribute('stroke-width','2'); vline.setAttribute('stroke-dasharray','4 4');
+    chart.appendChild(vline);
+
+    // Dosen-Marker
+    for(const dse of STATE.doses){
+      const tRelH = (now - dse.t)/3600000; // wie viele Stunden her
+      if(tRelH<0 || tRelH>hours) continue; // nur im Fenster
+      const px = P + (W-2*P) * (1 - tRelH/hours);
+      const py = (H-P) - (H-2*P) * (totalEffectAt(dse.t)/maxY);
+      const circ = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      circ.setAttribute('cx', px); circ.setAttribute('cy', py); circ.setAttribute('r','7');
+      circ.setAttribute('fill', STATE.models[dse.key].color);
+      circ.style.cursor='pointer';
+      circ.addEventListener('click', ()=>{
+        const m = STATE.models[dse.key];
+        alert(`${m.label}\n${new Date(dse.t).toLocaleString()}`);
+      });
+      chart.appendChild(circ);
+    }
+
+    nowValue.textContent = totalEffectAt(now).toFixed(2);
+  }
+
+  function redraw(){ renderDoseList(); renderNotes(); drawChart(); }
+
+  // ————————————————
+  // Einstellungen (Modelle)
+  // ————————————————
+  function renderSettings(){
+    settingsFields.innerHTML='';
+    Object.entries(STATE.models).forEach(([key,m])=>{
+      const box = document.createElement('div');
+      box.className='card';
+      box.style.padding='8px';
+      box.innerHTML = `<div style="font-weight:700; color:#d8e4ff; margin:6px 6px 8px;">${m.label}</div>`;
+      const wrap = document.createElement('div'); wrap.style.padding='0 8px 8px';
+
+      wrap.appendChild(inputRow('Elimination ke (1/h)', `ke_${key}`, m.ke));
+      wrap.appendChild(inputRow('Absorption ka (1/h)', `ka_${key}`, m.ka));
+      if(m.kind==='BIPHASIC') wrap.appendChild(inputRow('2. Freisetzung (h)', `lag2_${key}`, m.lag2));
+      if(m.kind==='CONCERTA'){
+        wrap.appendChild(inputRow('IR‑Anteil (0…1)', `irFraction_${key}`, m.irFraction));
+        wrap.appendChild(inputRow('Infusion Start (h)', `infusionStart_${key}`, m.infusionStart));
+        wrap.appendChild(inputRow('Infusion Ende (h)', `infusionEnd_${key}`, m.infusionEnd));
+      }
+      box.appendChild(wrap); settingsFields.appendChild(box);
+    });
+  }
+
+  function inputRow(lbl, id, val){
+    const div = document.createElement('div'); div.style.margin='6px 0';
+    const lab = document.createElement('label'); lab.textContent = lbl; lab.setAttribute('for', id);
+    const inp = document.createElement('input'); inp.id=id; inp.type='number'; inp.step='0.001'; inp.value=val; inp.style.width='100%';
+    div.appendChild(lab); div.appendChild(inp); return div;
+  }
+
+  function applySettingsFromUi(){
+    const next = JSON.parse(JSON.stringify(STATE.models));
+    for(const [key,m] of Object.entries(next)){
+      const g = (id)=> parseFloat(document.getElementById(id+"_"+key)?.value);
+      m.ke = parseFloat(document.getElementById(`ke_${key}`).value);
+      m.ka = parseFloat(document.getElementById(`ka_${key}`).value);
+      if(m.kind==='BIPHASIC') m.lag2 = parseFloat(document.getElementById(`lag2_${key}`).value);
+      if(m.kind==='CONCERTA'){
+        m.irFraction = parseFloat(document.getElementById(`irFraction_${key}`).value);
+        m.infusionStart = parseFloat(document.getElementById(`infusionStart_${key}`).value);
+        m.infusionEnd = parseFloat(document.getElementById(`infusionEnd_${key}`).value);
+      }
+    }
+    STATE.models = next; save('models', STATE.models); redraw();
+  }
+
+  function resetSettings(){ STATE.models = JSON.parse(JSON.stringify(DEFAULT_MODELS)); save('models', STATE.models); renderSettings(); redraw(); }
+
+  // ————————————————
+  // Events
+  // ————————————————
+  addDoseBtn.onclick = ()=>{
+    const key = medSel.value; const model = STATE.models[key]; if(!model) return;
+    const t = new Date(timeSel.value).getTime(); if(!Number.isFinite(t)) return alert('Bitte gültige Zeit wählen.');
+    STATE.doses.push({ id: uid(), key, mg: model.mg, t });
+    save('doses', STATE.doses); redraw();
+  };
+  addNowBtn.onclick = ()=>{ timeSel.value = toLocalDatetimeValue(Date.now()); };
+
+  btn24.onclick = ()=> setWindow(24);
+  btn48.onclick = ()=> setWindow(48);
+
+  saveNoteBtn.onclick = ()=>{
+    const text = noteTxt.value.trim(); if(!text) return;
+    STATE.notes.push({ id: uid(), t: Date.now(), text }); save('notes', STATE.notes); noteTxt.value=''; renderNotes();
+  };
+
+  exportBtn.onclick = ()=>{
+    const rows = [
+      ['type','datetime','med_key','label','mg','note','effect_at_time'],
+      ...STATE.doses.map(d=>['dose', new Date(d.t).toISOString(), d.key, STATE.models[d.key].label, d.mg, '', totalEffectAt(d.t).toFixed(4)]),
+      ...STATE.notes.map(n=>['note', new Date(n.t).toISOString(), '', '', '', n.text.replace(/\n/g,' '), totalEffectAt(n.t).toFixed(4)])
+    ];
+    const csv = rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='adhs-daten.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  };
+
+  clearBtn.onclick = ()=>{
+    if(confirm('Wirklich ALLE Dosen & Notizen löschen?')){
+      STATE.doses=[]; STATE.notes=[]; save('doses',STATE.doses); save('notes',STATE.notes); redraw();
+    }
+  };
+
+  // ————————————————
+  // Boot
+  // ————————————————
+  function boot(){
+    initMeds(); initTimeDefault(); renderDoseList(); renderNotes(); renderSettings(); drawChart();
+    // Service Worker registrieren (PWA offline)
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('./service-worker.js').catch(console.warn);
+    }
+    // Boot
+  function boot(){
+    initMeds(); initTimeDefault(); renderDoseList(); renderNotes(); renderSettings(); drawChart();
+    // Service Worker registrieren (PWA offline)
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('./service-worker.js').catch(console.warn);
+    }
+  }
+  boot();
+  </script>
+</body>
+</html>
