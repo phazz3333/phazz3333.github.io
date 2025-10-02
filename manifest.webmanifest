@@ -1,0 +1,23 @@
+{
+  "name": "ADHS Med Kurven",
+  "short_name": "ADHS Kurven",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0f1220",
+  "theme_color": "#0f1220",
+  "description": "Lokale PWA zur Visualisierung von addierten Wirkverläufen (ng/mL) und Notizen.",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
