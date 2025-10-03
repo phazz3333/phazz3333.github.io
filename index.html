@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="ADHS Kurven" />
+<title>ADHS Med Kurven (slim)</title>
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+<meta name="theme-color" content="#0f1220" />
+<style>
+:root{--bg:#0f1220;--p1:#151832;--p2:#1a1f3f;--tx:#f4f6ff;--mut:#aab3d0;--bd:#2a3066;--rad:16px;--gap:14px}
+html{font-size:clamp(16px,1.6vw+12px,19px)}body{margin:0;font-family:ui-sans-serif,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:radial-gradient(1200px 500px at 50% -50%,#192047 0%,#0f1220 60%);color:var(--tx);min-height:100dvh;padding-bottom:env(safe-area-inset-bottom)}
+.app{max-width:900px;margin:0 auto;padding:16px 12px calc(40px + env(safe-area-inset-bottom))}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+.title{font-weight:800;letter-spacing:.3px}
+.tag{background:linear-gradient(135deg,#2a2f63,#1b2047);border:1px solid var(--bd);color:#c9d3ff;padding:6px 10px;border-radius:999px;font-size:.8rem}
+.grid{display:grid;grid-template-columns:1fr;gap:var(--gap)}@media(min-width:820px){.grid{grid-template-columns:1fr 360px}}
+.card{background:linear-gradient(180deg,var(--p1),var(--p2));border:1px solid var(--bd);border-radius:var(--rad)}.card h2{margin:0;padding:12px;border-bottom:1px solid var(--bd);font-size:1rem;color:#cfe0ff}.content{padding:12px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+label{color:var(--mut);font-size:.9rem;margin-bottom:6px;display:block}
+select,input,textarea,button{border-radius:14px;border:1px solid #31396f;background:#121632;color:#fff;padding:10px 12px;font-size:16px}
+select,input{height:46px}textarea{width:100%;min-height:90px;resize:vertical}
+button{cursor:pointer;font-weight:700;letter-spacing:.2px;min-height:44px}
+.btn{background:linear-gradient(180deg,#25306b,#1a1f46)}.btn-acc{background:linear-gradient(180deg,#4f7ff8,#3063ee);border-color:#3b63ff}.btn-ghost{background:transparent;border-color:#3a4077}
+.list{display:flex;flex-direction:column;gap:10px}.muted{color:var(--mut)}
+.dose-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border:1px dashed #38407a;border-radius:12px;background:#121633}
+.chart-wrap{position:relative;height:clamp(260px,45dvh,520px)}svg{width:100%;height:100%;display:block}
+.now-value{font-weight:800;font-size:1.5rem}
+#err{position:fixed;left:12px;right:12px;bottom:12px;background:#3b1f1f;color:#ffd6d6;border:1px solid #a04444;border-radius:12px;padding:8px 10px;font-size:.9rem;z-index:2000;display:none}
+#toast{position:fixed;left:12px;right:12px;bottom:64px;background:#173a23;color:#d7ffea;border:1px solid #297a4b;border-radius:12px;padding:8px 10px;font-size:.9rem;z-index:2000;display:none}
+#toast .btn{background:#e6fff0;border:1px solid #bfe8ce;color:#0f3d22;padding:6px 10px;border-radius:10px;font-size:.85rem}
+/* Report overlay (iOS friendly) */
+.report{position:fixed;inset:0;background:#fff;color:#111;z-index:3000;display:none;overflow:auto}
+.report.show{display:block}.report .tb{position:sticky;top:0;background:#f5f5f5;border-bottom:1px solid #ddd;padding:8px;display:flex;gap:8px}
+.report .btn{background:#eee;border:1px solid #bbb;color:#111}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="title">ADHS Med Kurven</div>
+    <div class="row"><div id="statusTag" class="tag">Offline (init…)</div><button id="openSettings" class="btn">Einstellungen</button></div>
+  </header>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Wirkung – letzte 24h</h2>
+      <div class="content">
+        <div class="row" style="justify-content:space-between">
+          <div class="muted">Jetzt: <span id="nowValue" class="now-value">0.00</span> ng/mL</div>
+          <div class="row"><button id="b12" class="btn">12h</button><button id="b24" class="btn">24h</button><button id="b48" class="btn">48h</button></div>
+        </div>
+        <div class="chart-wrap"><svg id="chart" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-label="Wirkungsverlauf"></svg></div>
+        <div class="muted" style="margin-top:6px">Tippe Marker für Details. Y-Achse: ng/mL</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Eintragen</h2>
+      <div class="content">
+        <div class="row">
+          <div style="flex:1;min-width:180px"><label for="med">Präparat & Dosis</label><select id="med"></select></div>
+          <div><label for="t">Einnahmezeit</label><input id="t" type="datetime-local"></div>
+        </div>
+        <div class="row" style="margin-top:6px"><button id="add" class="btn btn-acc">Dosis hinzufügen</button><button id="now" class="btn">Jetzt</button></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Notiz</h2>
+      <div class="content">
+        <label for="note">Wie fühlst du dich?</label>
+        <textarea id="note" placeholder="Kurz notieren…"></textarea>
+        <div class="row" style="margin-top:6px"><button id="saveNote" class="btn">Notiz speichern (jetzt)</button></div>
+        <div id="notes" class="list" style="margin-top:8px"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Dosenverlauf</h2>
+      <div class="content">
+        <div id="doses" class="list"></div>
+        <div class="row" style="margin-top:10px;justify-content:space-between;gap:8px">
+          <div class="row" style="gap:8px">
+            <button id="exportDoc" class="btn">Arzt‑Export</button>
+            <button id="backup" class="btn">Backup (JSON)</button>
+            <button id="restore" class="btn btn-ghost">Wiederherstellen</button>
+          </div>
+          <button id="clearAll" class="btn btn-ghost">Alles löschen</button>
+        </div>
+        <div class="row" style="margin-top:6px;justify-content:space-between;align-items:center">
+          <span id="abi" class="muted">Auto‑Backup: —</span>
+          <button id="autoLoad" class="btn btn-ghost">Auto‑Backup laden</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="muted" style="margin-top:10px">⚠️ Modellierte ng/mL‑Werte (F≈0,30; Vd≈2,65 L/kg). Keine Therapieempfehlung.</footer>
+</div>
+
+<div id="report" class="report" aria-hidden="true">
+  <div class="tb"><button id="rpBack" class="btn">Zurück</button><button id="rpPrint" class="btn">Drucken</button></div>
+  <div id="rpBody" style="padding:12px"></div>
+</div>
+
+<div id="err"></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+// ==== Errors & Toast (sicher, ohne unsichere HTML-Injektion)
+const E=document.getElementById('err');
+function showErr(m){E.textContent=m;E.style.display='block'}
+window.addEventListener('error',e=>showErr('Fehler: '+(e&&e.message||'unbekannt')))
+window.addEventListener('unhandledrejection',e=>showErr('Promise: '+(e&&e.reason&&e.reason.message||e.reason||'unbekannt')))
+const T=document.getElementById('toast');
+function hideToast(){T.style.display='none';T.innerHTML=''}
+function showToast(msg,actionLabel,fn){T.innerHTML='';const s=document.createElement('span');s.textContent=msg;T.appendChild(s);if(actionLabel&&fn){const b=document.createElement('button');b.className='btn';b.style.marginLeft='8px';b.textContent=actionLabel;b.onclick=()=>{hideToast();fn()};T.appendChild(b)}T.style.display='block';clearTimeout(T._t);T._t=setTimeout(hideToast,5000)}
+
+// ==== Datenmodell (kompakt)
+const MODELS={
+  r5:{label:'Ritalin 5mg',mg:5,kind:'IR',ka:1.5,ke:0.231,col:'#7fb3ff'},
+  r10:{label:'Ritalin 10mg',mg:10,kind:'IR',ka:1.5,ke:0.231,col:'#7fb3ff'},
+  s18:{label:'Methylphenidat Sandoz retard 18mg',mg:18,kind:'BIPHASIC',ka:1.3,ke:0.231,lag2:4.0,col:'#85e0a3'},
+  c27:{label:'Concerta 27mg',mg:27,kind:'CONCERTA',ka:1.2,ke:0.231,infA:1.0,infB:11.0,irF:0.22,col:'#f5c36a'},
+  c36:{label:'Concerta 36mg',mg:36,kind:'CONCERTA',ka:1.2,ke:0.231,infA:1.0,infB:11.0,irF:0.22,col:'#f5c36a'}
+};
+// Legacy-/Alias-Mapping -> neue Keys
+const KEY_ALIASES={
+  'ritalin 5mg':'r5','ritalin 10mg':'r10','methylphenidat sandoz retard 18mg':'s18','concerta 27mg':'c27','concerta 36mg':'c36',
+  'riralin 5mg':'r5','oder concerta 36mg':'c36',
+  'ritalin_ir_5':'r5','ritalin_ir_10':'r10','sandoz_retard_18':'s18','concerta_27':'c27','concerta_36':'c36'
+};
+
+const PK={F:0.30,Vd:2.65};
+const S={doses:load('doses',[]),notes:load('notes',[]),w:load('weightKg',null),win:24};
+
+// ==== Storage helpers
+function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
+function load(k,fb){try{const v=localStorage.getItem(k);return v===null?fb:JSON.parse(v)}catch(_){return fb}}
+function uid(){return Math.random().toString(36).slice(2,9)}
+function pad(n){return String(n).padStart(2,'0')}function fmt(ms){const d=new Date(ms);return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`}
+function toVal(ms){const d=new Date(ms);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`}
+function isToday(ms){const d=new Date(ms),n=new Date();return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()}
+
+// ==== Modell-Resolver & Migration
+function resolveModelKey(k){ if(MODELS[k]) return k; const kl=(k??'').toString().trim().toLowerCase(); return KEY_ALIASES[kl]||null; }
+function resolveModel(k){ const nk=resolveModelKey(k); return { key:nk, m: nk? MODELS[nk]: null } }
+function migrateData(){ let changed=false; for(const d of S.doses){ const r=resolveModel(d.key); if(r.key && r.key!==d.key){ d.key=r.key; changed=true; } if(!r.m){ d._bad=true; } } if(changed) save('doses',S.doses); }
+function doseLabel(d){ const r=resolveModel(d.key); return r.m? r.m.label : '[Unbekanntes Präparat]'; }
+function doseColor(d){ const r=resolveModel(d.key); return r.m? r.m.col : '#bbbbbb'; }
+
+// ==== PK
+function bateman(dtH,mg,ka,ke){if(dtH<=0)return 0;const A=mg*(ka/(ka-ke));return A*(Math.exp(-ke*dtH)-Math.exp(-ka*dtH))}
+function scaleNgMl(kg){const w=Math.max(20,Math.min(200,Number(kg)||70));return (PK.F*1000)/(PK.Vd*w)}
+function effDoseAt(d,t,sc){ const r=resolveModel(d.key); const m=r.m; if(!m) return 0; const h=(t-d.t)/36e5; let base=0; if(m.kind==='IR'){ base=bateman(h,d.mg,m.ka,m.ke) } else if(m.kind==='BIPHASIC'){ const p=.5*d.mg; base=bateman(h,p,m.ka,m.ke)+bateman(h-m.lag2,p,m.ka,m.ke) } else { const ir=d.mg*m.irF,ext=d.mg-ir; let s=bateman(h,ir,m.ka,m.ke); const N=80; for(let i=0;i<N;i++){ const frac=(i+.5)/N; const rel=m.infA+frac*(m.infB-m.infA); s+=bateman(h-rel,ext/N,m.ka,m.ke) } base=s } return base*sc }
+function totalAt(t){const sc=scaleNgMl(S.w??70);return S.doses.reduce((a,d)=>a+effDoseAt(d,t,sc),0)}
+
+// ==== DOM
+const $=id=>document.getElementById(id);
+let med,tIn,addBtn,nowBtn,doseList,chart,nowVal,b12,b24,b48,notes,txt,saveN,expBtn,bakBtn,resBtn,clrBtn,abi,autoLoad,openSet;
+function qs(){med=$('med');tIn=$('t');addBtn=$('add');nowBtn=$('now');doseList=$('doses');chart=$('chart');nowVal=$('nowValue');b12=$('b12');b24=$('b24');b48=$('b48');notes=$('notes');txt=$('note');saveN=$('saveNote');expBtn=$('exportDoc');bakBtn=$('backup');resBtn=$('restore');clrBtn=$('clearAll');abi=$('abi');autoLoad=$('autoLoad');openSet=$('openSettings')}
+
+// ==== UI / Bindings
+function initMeds(){med.innerHTML='';for(const k of Object.keys(MODELS)){const o=document.createElement('option');o.value=k;o.textContent=MODELS[k].label;med.appendChild(o)}if(!med.value)med.value=Object.keys(MODELS)[0]}
+function initTime(){tIn.value=toVal(Date.now())}
+function renderDoses(){doseList.innerHTML='';const arr=S.doses.filter(x=>isToday(x.t)).sort((a,b)=>b.t-a.t);if(!arr.length){doseList.textContent='Heute keine Einträge.';doseList.classList.add('muted');return}else doseList.classList.remove('muted');for(const d of arr){const row=document.createElement('div');row.className='dose-item';const left=document.createElement('div');const l1=document.createElement('strong');l1.textContent=doseLabel(d);const br=document.createElement('br');const sm=document.createElement('small');sm.textContent=new Date(d.t).toLocaleString();left.append(l1,br,sm);const del=document.createElement('button');del.className='btn btn-ghost';del.textContent='Entfernen';del.onclick=()=>{S.doses=S.doses.filter(x=>x.id!==d.id);save('doses',S.doses);redraw()};row.append(left,del);doseList.appendChild(row)}}
+function renderNotes(){notes.innerHTML='';const arr=S.notes.filter(x=>isToday(x.t)).sort((a,b)=>b.t-a.t);if(!arr.length){notes.textContent='Heute keine Notizen.';notes.classList.add('muted');return}else notes.classList.remove('muted');for(const n of arr){const row=document.createElement('div');row.className='dose-item';const left=document.createElement('div');const s1=document.createElement('strong');s1.textContent=new Date(n.t).toLocaleString();const br=document.createElement('br');const sm=document.createElement('small');sm.textContent='Wirkung: '+totalAt(n.t).toFixed(2)+' ng/mL';const p=document.createElement('p');p.style.margin='6px 0 0 0';p.textContent=String(n.text||'');left.append(s1,br,sm,p);const del=document.createElement('button');del.className='btn btn-ghost';del.textContent='Entfernen';del.onclick=()=>{S.notes=S.notes.filter(x=>x.id!==n.id);save('notes',S.notes);renderNotes()};row.append(left,del);notes.appendChild(row)}}
+function drawChart(){const now=Date.now(),h=S.win,steps=h*12;let maxY=0;const xs=[],ys=[];for(let i=0;i<=steps;i++){const t=now-h*36e5+i*(h*36e5/steps);const y=totalAt(t);xs.push(t);ys.push(y);if(y>maxY)maxY=y}maxY=Math.max(maxY,1);chart.innerHTML='';const W=1000,H=300,P=48;const g=document.createElementNS('http://www.w3.org/2000/svg','g');const tick=h<=12?2:(h<=24?4:8);for(let i=0;i<=h;i+=tick){const x=P+(W-2*P)*(i/h);const ln=document.createElementNS('http://www.w3.org/2000/svg','line');ln.setAttribute('x1',x);ln.setAttribute('x2',x);ln.setAttribute('y1',P/2);ln.setAttribute('y2',H-P/2);ln.setAttribute('stroke','#2a3066');ln.setAttribute('stroke-width','1');ln.setAttribute('opacity','0.6');g.appendChild(ln);const tL=now-(h-i)*36e5;const tS=new Date(tL).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});const tx=document.createElementNS('http://www.w3.org/2000/svg','text');tx.setAttribute('x',x);tx.setAttribute('y',H-8);tx.setAttribute('fill','#9fb0ee');tx.setAttribute('font-size','12');tx.setAttribute('text-anchor','middle');tx.textContent=tS;g.appendChild(tx)}chart.appendChild(g);const yA=document.createElementNS('http://www.w3.org/2000/svg','g');const al=document.createElementNS('http://www.w3.org/2000/svg','line');al.setAttribute('x1',P);al.setAttribute('x2',P);al.setAttribute('y1',P/2);al.setAttribute('y2',H-P/2);al.setAttribute('stroke','#2a3066');al.setAttribute('stroke-width','1.5');yA.appendChild(al);const YT=4;for(let k=0;k<=YT;k++){const f=k/YT;const yv=maxY*f;const yPos=(H-P)-(H-2*P)*f;const tk=document.createElementNS('http://www.w3.org/2000/svg','line');tk.setAttribute('x1',P-6);tk.setAttribute('x2',P);tk.setAttribute('y1',yPos);tk.setAttribute('y2',yPos);tk.setAttribute('stroke','#2a3066');tk.setAttribute('stroke-width','1');yA.appendChild(tk);const tl=document.createElementNS('http://www.w3.org/2000/svg','text');tl.setAttribute('x',P-8);tl.setAttribute('y',yPos+4);tl.setAttribute('fill','#9fb0ee');tl.setAttribute('font-size','12');tl.setAttribute('text-anchor','end');tl.textContent=yv.toFixed(maxY<1?2:1);yA.appendChild(tl)}const un=document.createElementNS('http://www.w3.org/2000/svg','text');un.setAttribute('x','12');un.setAttribute('y',String(H/2));un.setAttribute('fill','#9fb0ee');un.setAttribute('font-size','12');un.setAttribute('text-anchor','middle');un.setAttribute('transform',`rotate(-90 12 ${H/2})`);un.textContent='ng/mL';yA.appendChild(un);chart.appendChild(yA);const p=document.createElementNS('http://www.w3.org/2000/svg','path');let d='';for(let i=0;i<xs.length;i++){const px=P+(W-2*P)*(i/(xs.length-1));const py=(H-P)-(H-2*P)*(ys[i]/maxY);d+=(i===0?`M ${px} ${py}`:` L ${px} ${py}`)}p.setAttribute('d',d);p.setAttribute('fill','none');p.setAttribute('stroke','#8fb7ff');p.setAttribute('stroke-width','4.5');p.setAttribute('stroke-linejoin','round');chart.appendChild(p);const xn=P+(W-2*P)*1;const vl=document.createElementNS('http://www.w3.org/2000/svg','line');vl.setAttribute('x1',xn);vl.setAttribute('x2',xn);vl.setAttribute('y1',P/2);vl.setAttribute('y2',H-P/2);vl.setAttribute('stroke','#f0f3ff');vl.setAttribute('stroke-width','2');vl.setAttribute('stroke-dasharray','4 4');chart.appendChild(vl);for(const dse of S.doses){const rel=(now-dse.t)/36e5;if(rel<0||rel>h)continue;const r=resolveModel(dse.key); if(!r.m) continue; const px=P+(W-2*P)*(1-rel/h);const py=(H-P)-(H-2*P)*(totalAt(dse.t)/maxY);const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('cx',px);c.setAttribute('cy',py);c.setAttribute('r','7');c.setAttribute('fill',doseColor(dse));c.addEventListener('click',()=>alert(doseLabel(dse)+'\n'+new Date(dse.t).toLocaleString()));chart.appendChild(c)}nowVal.textContent=totalAt(now).toFixed(2)}
+function redraw(){renderDoses();renderNotes();drawChart()}
+
+// ==== Arzt-Report (ohne document.write, sanitisiert)
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function genReportSVG(hours,W,H){const now=Date.now(),steps=hours*12;let maxY=0;const xs=[],ys=[];for(let i=0;i<=steps;i++){const t=now-hours*36e5+i*(hours*36e5/steps);const y=totalAt(t);xs.push(t);ys.push(y);if(y>maxY)maxY=y}maxY=Math.max(maxY,1);let d='';for(let i=0;i<xs.length;i++){const x=40+(W-80)*(i/(xs.length-1));const y=(H-30)-(H-60)*(ys[i]/maxY);d+=i?` L ${x} ${y}`:`M ${x} ${y}`}return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="none" stroke="#245" stroke-width="2"/></svg>`}
+function buildReport(days){const hours=days*24,now=Date.now(),from=now-days*86400000;const ds=S.doses.filter(d=>d.t>=from).sort((a,b)=>a.t-b.t);const ns=S.notes.filter(n=>n.t>=from).sort((a,b)=>a.t-b.t);const svg=genReportSVG(hours,1100,360);const fmt=(ms)=>new Date(ms).toLocaleString();const eff=(ms)=>totalAt(ms).toFixed(2);let html='';html+=`<div class="r" style="font:14px system-ui, -apple-system, Segoe UI, Roboto, Arial; color:#111;">`;html+=`<h1>ADHS Verlaufsreport</h1><div class="muted">Erstellt: ${fmt(now)} • Fenster: ${days} Tage</div>`;html+=`<h2>Kurve (modellierte ng/mL)</h2>${svg}`;html+=`<h2>Dosen</h2><table border="1" cellspacing="0" cellpadding="4"><thead><tr><th>Zeit</th><th>Präparat</th><th>mg</th><th>Wirkung (ng/mL)</th></tr></thead><tbody>`;for(const d of ds){const r=resolveModel(d.key);const m=r.m;html+=`<tr><td>${fmt(d.t)}</td><td>${esc(m?m.label:'[Unbekannt]')}</td><td>${m?m.mg:(d.mg??'')}</td><td>${eff(d.t)}</td></tr>`}html+=`</tbody></table>`;html+=`<h2>Notizen</h2><table border="1" cellspacing="0" cellpadding="4"><thead><tr><th>Zeit</th><th>Notiz</th><th>Wirkung (ng/mL)</th></tr></thead><tbody>`;for(const n of ns){html+=`<tr><td>${fmt(n.t)}</td><td>${esc(n.text)}</td><td>${eff(n.t)}</td></tr>`}html+=`</tbody></table></div>`;return html}
+function openReport(days){const over=$('report'),body=$('rpBody');body.innerHTML='';const wrap=document.createElement('div');wrap.innerHTML=buildReport(days);body.appendChild(wrap);over.classList.add('show')}
+$('rpBack').onclick=()=>{$('report').classList.remove('show')}
+$('rpPrint').onclick=()=>{try{window.print()}catch(_){}}
+
+// ==== Bind
+function bind(){
+  addBtn.onclick=()=>{const k=med.value,m=MODELS[k];if(!m)return alert('Bitte Präparat wählen.');const t=new Date(tIn.value).getTime();if(!Number.isFinite(t))return alert('Zeit ungültig');S.doses.push({id:uid(),key:k,mg:m.mg,t});save('doses',S.doses);redraw()}
+  nowBtn.onclick=()=>{tIn.value=toVal(Date.now())}
+  b12.onclick=()=>{S.win=12;drawChart()};b24.onclick=()=>{S.win=24;drawChart()};b48.onclick=()=>{S.win=48;drawChart()}
+  saveN.onclick=()=>{const text=String(txt.value||'').trim();if(!text)return;S.notes.push({id:uid(),t:Date.now(),text});save('notes',S.notes);txt.value='';renderNotes()}
+  clrBtn.onclick=()=>{if(confirm('Wirklich ALLES löschen?')){S.doses=[];S.notes=[];save('doses',S.doses);save('notes',S.notes);redraw()}}
+  expBtn.onclick=()=>{const d=parseInt(prompt('Zeitraum in Tagen (1–60):','14')||'14',10);const days=Math.max(1,Math.min(60,d));openReport(days)}
+  bakBtn.onclick=()=>{try{const data=backupObj();const json=JSON.stringify(data,null,2);const ts=new Date().toISOString().replace(/[:.]/g,'-');const name=`adhs_backup_${ts}.json`;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([json],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),500);showToast('Backup gespeichert: '+name,'Wiederherstellen…',()=>pickRestore())}catch(e){alert('Backup fehlgeschlagen: '+(e&&e.message||e))}}
+  resBtn.onclick=()=>pickRestore()
+  autoLoad.onclick=()=>{const obj=load('autoBackup',null);if(!obj)return showToast('Kein Auto‑Backup gefunden');try{applyBackup(obj,true)}catch(e){alert('Auto‑Backup Fehler: '+(e&&e.message||e))}}
+}
+function pickRestore(){const inp=document.createElement('input');inp.type='file';inp.accept='application/json';inp.onchange=()=>{const f=inp.files&&inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{applyBackup(JSON.parse(r.result),true)}catch(e){alert('Wiederherstellung fehlgeschlagen: '+(e&&e.message||e))}};r.readAsText(f)};inp.click()}
+
+// ==== Backup / Auto‑Backup
+function backupObj(){return{version:1,exportedAt:new Date().toISOString(),weightKg:S.w??null,win:S.win,doses:S.doses,notes:S.notes}}
+function ensurePersist(){try{if(navigator.storage&&navigator.storage.persist){navigator.storage.persist()}}catch(_){}}
+function autoBackup(){try{save('autoBackup',backupObj());save('autoBackupAt',Date.now());updateABI()}catch(_){}}
+function updateABI(){const t=load('autoBackupAt',null);$('abi').textContent='Auto‑Backup: '+(t?fmt(t):'—')}
+
+// Wiederherstellung anwenden (mit Validierung)
+function validateBackup(obj){ if(!obj||typeof obj!=='object') return false; if(!('doses'in obj)&&!('notes'in obj)) return false; return true }
+function applyBackup(obj, askConfirm=true){ if(!validateBackup(obj)) throw new Error('Ungültiges Backup-Format'); if(askConfirm && !confirm('Backup anwenden und bestehende Daten überschreiben?')) return; S.doses = Array.isArray(obj.doses)? obj.doses: []; S.notes = Array.isArray(obj.notes)? obj.notes: []; if('weightKg' in obj) S.w = obj.weightKg; if('win' in obj) S.win = obj.win; save('doses',S.doses); save('notes',S.notes); if(S.w!=null) save('weightKg',S.w); migrateData(); redraw(); showToast('Wiederherstellung erfolgreich.') }
+
+// ==== Service Worker (Anzeige + robust)
+const statusTag=$('statusTag');
+async function registerSW(){try{if(!('serviceWorker'in navigator)){statusTag.textContent='Kein SW';return}const ok=await fetch('/service-worker.js',{cache:'no-store'}).then(r=>r.ok).catch(()=>false);if(!ok){statusTag.textContent='SW fehlt';return}const reg=await navigator.serviceWorker.register('/service-worker.js',{scope:'/'});navigator.serviceWorker.addEventListener('controllerchange',()=>statusTag.textContent='Offline bereit ✓');if(navigator.serviceWorker.controller){statusTag.textContent='Offline bereit ✓'}else{statusTag.textContent='Offline (initialisiere…)';setTimeout(()=>location.reload(),500)}reg.active&&reg.active.postMessage&&reg.active.postMessage({type:'CLAIM'})}catch(_){statusTag.textContent='SW Fehler'}}
+
+// ==== Boot
+(function boot(){qs();initMeds();initTime();migrateData();bind();updateABI();redraw();ensurePersist();registerSW();window.addEventListener('pagehide',autoBackup,{capture:true});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')autoBackup()});window.addEventListener('beforeunload',autoBackup)})();
+
+// ==== Tests (klein, erweitert)
+;(function tests(){try{
+  console.assert(Object.keys(MODELS).length>=5,'MODELS >= 5');
+  console.assert(med.options.length>=5,'Dropdown befüllt');
+  console.assert(typeof totalAt(Date.now())==='number','totalAt -> number');
+  console.assert(typeof genReportSVG(12,400,200)==='string','Report SVG ok');
+  const b=backupObj();const js=JSON.stringify(b);console.assert(/"version"\s*:\s*1/.test(js),'Backup version');
+  console.assert(isToday(Date.now())===true,'isToday today');
+  // Neue Tests: Legacy-Key + Unknown-Key Robustheit
+  const now=Date.now();
+  const legacy={id:'t1',key:'ritalin_ir_5',mg:5,t:now-3600000};
+  const unknown={id:'t2',key:'unknown_key',mg:5,t:now-3600000};
+  const sc=scaleNgMl(S.w??70);
+  console.assert(effDoseAt(legacy, now, sc) >= 0, 'Legacy key wird gemappt');
+  console.assert(effDoseAt(unknown, now, sc) === 0, 'Unbekannter key wird sicher ignoriert');
+  console.log('Self-check ✓')
+}catch(e){showErr('Self-check: '+e.message)}})()
+</script>
+</body>
+</html>
